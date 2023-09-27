@@ -47,7 +47,6 @@ namespace SwarmSight
                 btnPlayPause = btnPlayPause,
                 btnStepFrame = btnStepFrame,
                 btnSave = btnSaveActivity,
-                btnStop = btnStop,
                 Canvas = videoCanvas,
                 lblTime = lblTime,
                 lblFPS = lblFPS,

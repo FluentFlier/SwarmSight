@@ -213,14 +213,25 @@ namespace SwarmSight
             var working = false;
             var reachedEndOfVideo = false;
             BatchItem currentItem = null;
-            WindowManager.ProcessorWindow.Controller.Pipeline.OnReachedEndOfVideo += () => reachedEndOfVideo = true;
 
-            //While there is work to do
-            while (dontStop && (working || Items.Any(i => i.Status == BatchItemStatus.NotStarted)))
+            // Handle a bug where videos don't start playing when the video ends
+            // This is a hack! Do not use the stop button while batch processing
+            void Pipeline_Stopped(object sender, EventArgs e)
             {
-                if(!working)
+                reachedEndOfVideo = true;
+            }
+
+            WindowManager.ProcessorWindow.Controller.Pipeline.Stopped += Pipeline_Stopped;
+            WindowManager.ProcessorWindow.Controller.Pipeline.OnReachedEndOfVideo += 
+                () => reachedEndOfVideo = true;
+
+            // While there is work to do
+            while (dontStop && 
+                  (working || Items.Any(i => i.Status == BatchItemStatus.NotStarted)))
+            {
+                if (!working)
                 {
-                    currentItem = Items.First(i => i.Status == BatchItemStatus.NotStarted);                    
+                    currentItem = Items.First(i => i.Status == BatchItemStatus.NotStarted);   
 
                     WindowManager.ProcessorWindow.LoadParamsFromJSON(currentItem.ParamsText);
 
@@ -239,10 +250,10 @@ namespace SwarmSight
                     
                     working = true;
                 }
-                else //working
+                else // Working
                 {
                     //Check if finished
-                    if(reachedEndOfVideo)
+                    if (reachedEndOfVideo)
                     {
                         currentItem.Status = BatchItemStatus.Finished;
                         WindowManager.ProcessorWindow.SaveCSV((object)currentItem.File);
@@ -272,7 +283,6 @@ namespace SwarmSight
                             dataGrid.DataContext = null;
                             dataGrid.DataContext = Items;
                         });
-
                         
                         working = false;
                     }

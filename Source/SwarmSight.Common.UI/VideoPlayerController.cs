@@ -22,7 +22,6 @@ namespace SwarmSight
         public Button btnBrowse;
         public Image Canvas;
         public Button btnPlayPause;
-        public Button btnStop;
         public Button btnStepFrame;
         public Slider sliderTime;
         public Label lblTime;
@@ -52,18 +51,15 @@ namespace SwarmSight
             Application.Current.Exit += OnExiting;
 
             btnPlayPause.FontFamily = 
-                btnStop.FontFamily = 
                 btnStepFrame.FontFamily = 
                 new FontFamily(Constants.SymbolFontFamily);
 
             btnPlayPause.Content = Constants.PlaySymbol;
-            btnStop.Content = Constants.StopSymbol;
             btnStepFrame.Content = Constants.StepSymbol;
 
             txtFileName.LostFocus += txtFileName_LostFocus;
             btnBrowse.Click += OnBrowseClicked;
             btnPlayPause.Click += OnPlayClicked;
-            btnStop.Click += OnStopClicked;
             btnStepFrame.Click += OnStepClicked;
             sliderTime.MouseDown += sliderTime_MouseDown;
             sliderTime.PreviewMouseDown += sliderTime_MouseDown;
@@ -357,11 +353,6 @@ namespace SwarmSight
         private void OnPlayClicked(object sender, RoutedEventArgs e)
         {
             Play();
-        }
-
-        private void OnStopClicked(object sender, RoutedEventArgs e)
-        {
-            Stop();
         }
 
 
