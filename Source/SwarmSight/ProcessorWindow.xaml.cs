@@ -1,623 +1,610 @@
-﻿using Classes;
-using Settings;
-using SwarmSight.Filters;
+﻿using Settings;
 using SwarmSight.HeadPartsTracking;
-
 using SwarmSight.Helpers;
-using SwarmSight.VideoPlayer;
-using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Deployment.Application;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using DPoint = System.Drawing.Point;
 using Frame = SwarmSight.Filters.Frame;
 using Point = System.Windows.Point;
-using DPoint = System.Drawing.Point;
-using System.Deployment.Application;
 
-namespace SwarmSight
+namespace SwarmSight;
+
+/// <summary>
+/// Interaction logic for MainWindow.xaml
+/// </summary>
+public partial class ProcessorWindow
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class ProcessorWindow
+    private WindowManager WindowManager
     {
-        private WindowManager WindowManager
+        get
         {
-            get
-            {
-                return ((WindowManager)Application.Current);
-            }
+            return ((WindowManager)Application.Current);
         }
+    }
 
-        public EfficientTipAndPERdetector Processor;
-        public VideoPlayerController Controller;
+    public EfficientTipAndPERdetector Processor;
+    public VideoPlayerController Controller;
 
-        public ProcessorWindow()
+    public ProcessorWindow()
+    {
+        AppSettings.Default.Upgrade();
+        
+        InitializeComponent();
+
+        try { Title += " " + ApplicationDeployment.CurrentDeployment.CurrentVersion; } catch { }
+
+        Controller = new VideoPlayerController
         {
-            AppSettings.Default.Upgrade();
-            
-            InitializeComponent();
+            btnBrowse = btnBrowse,
+            btnPlayPause = btnPlayPause,
+            btnSave = btnSaveActivity,
+            btnStepFrame = btnStepFrame,
+            Canvas = videoCanvas,
+            lblTime = lblTime,
+            lblFPS = lblFPS,
+            sliderTime = sliderTime,
+            txtFileName = txtFileName,
+            Quality = AppSettings.Default.Quality,
+        };
 
-            try { Title += " " + ApplicationDeployment.CurrentDeployment.CurrentVersion; } catch { }
+        Controller.OnFinishSetupPlayer += OnFinishSetupPlayer;
+        Controller.OnOpen += OnOpen;
+        Controller.OnReset += InitDetector;
+        Controller.OnShowFrame += OnShowFrame;
+        Controller.OnRefreshMostRecentFrame += OnRefreshMostRecentFrame;
+        Controller.OnAfterStopped += () => Activate();
+        Controller.Init();
 
-            Controller = new VideoPlayerController
-            {
-                btnBrowse = btnBrowse,
-                btnPlayPause = btnPlayPause,
-                btnSave = btnSaveActivity,
-                btnStepFrame = btnStepFrame,
-                Canvas = videoCanvas,
-                lblTime = lblTime,
-                lblFPS = lblFPS,
-                sliderTime = sliderTime,
-                txtFileName = txtFileName,
-                Quality = AppSettings.Default.Quality,
-            };
+        sliderX.Label = "X:";
+        sliderX.SettingsKey = "HeadX";
+        sliderX.IsEnabled = false;
+        sliderX.LoadFromSettings();
+        sliderX.OnChanged += SyncAntennaSensor;
+        sliderX.OnBeginChange += Controller.Stop;
 
-            Controller.OnFinishSetupPlayer += OnFinishSetupPlayer;
-            Controller.OnOpen += OnOpen;
-            Controller.OnReset += InitDetector;
-            Controller.OnShowFrame += OnShowFrame;
-            Controller.OnRefreshMostRecentFrame += OnRefreshMostRecentFrame;
-            Controller.OnAfterStopped += () => Activate();
-            Controller.Init();
+        sliderY.Label = "Y:";
+        sliderY.SettingsKey = "HeadY";
+        sliderY.IsEnabled = false;
+        sliderY.LoadFromSettings();
+        sliderY.OnChanged += SyncAntennaSensor;
+        sliderY.OnBeginChange += Controller.Stop;
 
-            sliderX.Label = "X:";
-            sliderX.SettingsKey = "HeadX";
-            sliderX.IsEnabled = false;
-            sliderX.LoadFromSettings();
-            sliderX.OnChanged += SyncAntennaSensor;
-            sliderX.OnBeginChange += Controller.Stop;
+        sliderScale.Label = "Scale:";
+        sliderScale.SettingsKey = "HeadScale";
+        sliderScale.IsValueInt = false;
+        sliderScale.IsEnabled = false;
+        sliderScale.LoadFromSettings();
+        sliderScale.OnChanged += SyncAntennaSensor;
+        sliderScale.OnBeginChange += Controller.Stop;
 
-            sliderY.Label = "Y:";
-            sliderY.SettingsKey = "HeadY";
-            sliderY.IsEnabled = false;
-            sliderY.LoadFromSettings();
-            sliderY.OnChanged += SyncAntennaSensor;
-            sliderY.OnBeginChange += Controller.Stop;
+        sliderAngle.Label = "Angle:";
+        sliderAngle.SettingsKey = "HeadAngle";
+        sliderAngle.IsValueInt = false;
+        sliderAngle.IsEnabled = false;
+        sliderAngle.LoadFromSettings();
+        sliderAngle.OnChanged += SyncAntennaSensor;
+        sliderAngle.OnBeginChange += Controller.Stop;
 
-            sliderScale.Label = "Scale:";
-            sliderScale.SettingsKey = "HeadScale";
-            sliderScale.IsValueInt = false;
-            sliderScale.IsEnabled = false;
-            sliderScale.LoadFromSettings();
-            sliderScale.OnChanged += SyncAntennaSensor;
-            sliderScale.OnBeginChange += Controller.Stop;
+        sliderTreatX.Label = "X:";
+        sliderTreatX.SettingsKey = "TreatmentSensorX";
+        sliderTreatX.IsEnabled = false;
+        sliderTreatX.LoadFromSettings();
+        sliderTreatX.OnChanged += SyncTreatmentSensor;
 
-            sliderAngle.Label = "Angle:";
-            sliderAngle.SettingsKey = "HeadAngle";
-            sliderAngle.IsValueInt = false;
-            sliderAngle.IsEnabled = false;
-            sliderAngle.LoadFromSettings();
-            sliderAngle.OnChanged += SyncAntennaSensor;
-            sliderAngle.OnBeginChange += Controller.Stop;
+        sliderTreatY.Label = "Y:";
+        sliderTreatY.SettingsKey = "TreatmentSensorY";
+        sliderTreatY.IsEnabled = false;
+        sliderTreatY.LoadFromSettings();
+        sliderTreatY.OnChanged += SyncTreatmentSensor;
 
-            sliderTreatX.Label = "X:";
-            sliderTreatX.SettingsKey = "TreatmentSensorX";
-            sliderTreatX.IsEnabled = false;
-            sliderTreatX.LoadFromSettings();
-            sliderTreatX.OnChanged += SyncTreatmentSensor;
+        sliderFast.Label = "Fast Motion Threshold:";
+        sliderFast.SettingsKey = "FastThreshold";
+        sliderFast.LoadFromSettings();
 
-            sliderTreatY.Label = "Y:";
-            sliderTreatY.SettingsKey = "TreatmentSensorY";
-            sliderTreatY.IsEnabled = false;
-            sliderTreatY.LoadFromSettings();
-            sliderTreatY.OnChanged += SyncTreatmentSensor;
+        sliderSlow.Label = "Slow Motion Threshold:";
+        sliderSlow.SettingsKey = "SlowThreshold";
+        sliderSlow.LoadFromSettings();
 
-            sliderFast.Label = "Fast Motion Threshold:";
-            sliderFast.SettingsKey = "FastThreshold";
-            sliderFast.LoadFromSettings();
+        sliderStationary.Label = "Stationary Threshold:";
+        sliderStationary.SettingsKey = "StationaryThreshold";
+        sliderStationary.LoadFromSettings();
 
-            sliderSlow.Label = "Slow Motion Threshold:";
-            sliderSlow.SettingsKey = "SlowThreshold";
-            sliderSlow.LoadFromSettings();
-
-            sliderStationary.Label = "Stationary Threshold:";
-            sliderStationary.SettingsKey = "StationaryThreshold";
-            sliderStationary.LoadFromSettings();
-
-            SizeChanged += (sender, e) =>
-            {
-                SetupCanvas();
-
-                SyncAntennaSensor();
-                SyncTreatmentSensor();
-                SyncExclusionZones();
-            };
-
-            Closing += (sender, args) =>
-            {
-                Controller.Stop();
-                Hide();
-                WindowManager.ExitIfLastWindow();
-            };
-
-            WindowManager.Exit += (sender, args) => Controller.Stop();
-        }
-
-        private void OnFinishSetupPlayer()
+        SizeChanged += (sender, e) =>
         {
-            InitDetector();
-
-            ShowHideModelViews(hide: true);
-        }
-
-        public double CanvasScale = 1.0;
-        private void SetupCanvas()
-        {
-            if (Controller.Pipeline.VideoInfo == null)
-                return;
-
-            CanvasScale = videoCanvas.ActualWidth / Controller.Pipeline.VideoInfo.Width;
-            canvasRow.Height = new GridLength(Controller.Pipeline.VideoInfo.Height * CanvasScale + videoCanvas.Margin.Top);
-
-            scrollViewer.Height = canvasRow.Height.Value + 30;
-
-            Height = double.NaN;
-            SizeToContent = SizeToContent.Height;
-        }
-
-        private void SetupAntennaSensor()
-        {
-            antennaSensor.Canvas = videoCanvas;
-            antennaSensor.CanvasScale = CanvasScale;
-            antennaSensor.Dimensions = new Point(AppSettings.Default.HeadScale * 100, AppSettings.Default.HeadScale * 100);
-            antennaSensor.Position = Controller.ToCanvasCoordinates(AppSettings.Default.Origin);
-            antennaSensor.Angle = AppSettings.Default.HeadAngle;
-
-            antennaSensor.MouseDown += (s, e) =>
-            {
-                Controller.Pause();
-            };
-
-            antennaSensor.Moved += (s, e) =>
-            {
-                var loc = Controller.ToVideoCoordinates(antennaSensor.Position);
-
-                AppSettings.Default.HeadX = loc.X;
-                AppSettings.Default.HeadY = loc.Y;
-                AppSettings.Default.SaveAsync();
-
-                LoadFromSettings();
-
-                Controller.RefreshMostRecentFrame();
-
-                Controller.Stop();
-            };
-
-            antennaSensor.Scaled += (s, e) =>
-            {
-                var loc = Controller.ToVideoCoordinates(antennaSensor.Position);
-                var dims = Controller.ToVideoCoordinates(antennaSensor.Dimensions);
-
-                AppSettings.Default.HeadX = loc.X;
-                AppSettings.Default.HeadY = loc.Y;
-                AppSettings.Default.HeadScale = antennaSensor.Scale;
-                AppSettings.Default.SaveAsync();
-
-                LoadFromSettings();
-
-                Controller.RefreshMostRecentFrame();
-
-                Controller.Stop();
-            };
-
-            antennaSensor.Rotated += (s, e) =>
-            {
-                AppSettings.Default.HeadAngle = antennaSensor.Angle;
-                AppSettings.Default.SaveAsync();
-
-                LoadFromSettings();
-
-                Controller.RefreshMostRecentFrame();
-
-                Controller.Stop();
-            };
-        }
-
-        private void SetupExclusionZones()
-        {
-            exclusionManager.window = this;
-            exclusionManager.LoadFromSettings();
-
-            exclusionManager.Changed += (s, e) =>
-            {
-                Controller.Stop();
-            };
-        }
-
-        private void SetupTreatmentSensor()
-        {
-            treatmentSensor.Canvas = videoCanvas;
-            treatmentSensor.Position = Controller.ToCanvasCoordinates(new DPoint(AppSettings.Default.TreatmentSensorX, AppSettings.Default.TreatmentSensorY));
-            
-            treatmentSensor.Moved += (s, e) =>
-            {
-                var loc = Controller.ToVideoCoordinates(treatmentSensor.Position);
-
-                AppSettings.Default.TreatmentSensorX = loc.X;
-                AppSettings.Default.TreatmentSensorY = loc.Y;
-                AppSettings.Default.SaveAsync();
-
-                LoadFromSettings();
-            };
-        }
-
-        private void LoadFromSettings()
-        {
-            ValidateSettings();
-
-            var headPos = new System.Drawing.Point(AppSettings.Default.HeadX, AppSettings.Default.HeadY);
-            var dim = AppSettings.Default.HeadScale * 100 * CanvasScale;
-
-            sliderX.Max = AppSettings.Default.MaxHeadX;
-            sliderX.IsEnabled = true;
-            sliderX.LoadFromSettings();
-
-            sliderY.Max = AppSettings.Default.MaxHeadY;
-            sliderY.LoadFromSettings();
-            sliderY.IsEnabled = true;
-
-            sliderScale.Max = AppSettings.Default.MaxHeadScale;
-            sliderScale.Min = 0.1;
-            sliderScale.LoadFromSettings();
-            sliderScale.IsEnabled = true;
-
-            sliderAngle.Max = 360;
-            sliderAngle.Min = -360;
-            sliderAngle.LoadFromSettings();
-            sliderAngle.IsEnabled = true;
-
-            sliderTreatX.Max = AppSettings.Default.MaxTreatX;
-            sliderTreatX.LoadFromSettings();
-            sliderTreatX.IsEnabled = true;
-
-            sliderTreatY.Max = AppSettings.Default.MaxTreatY;
-            sliderTreatY.LoadFromSettings();
-            sliderTreatY.IsEnabled = true;
-
-            chkShowFilterPoints.IsChecked = AppSettings.Default.ShowModel;
-            txtVideoLabel.Text = AppSettings.Default.VideoLabel;
-            txtVideoLabelColumn.Text = AppSettings.Default.VideoLabelColumn;
-
-        }
-
-        private void ValidateSettings()
-        {
-            AppSettings.Default.Validate(Controller.Pipeline.VideoInfo.Dimensions);
-        }
-
-        private void SyncAntennaSensor()
-        {
-            var headPos = new System.Drawing.Point(AppSettings.Default.HeadX, AppSettings.Default.HeadY);
-            var dim = AppSettings.Default.HeadScale * 100 * CanvasScale;
-            
-            if (Controller?.Pipeline?.VideoInfo != null)
-            {
-                antennaSensor.Position = Controller.ToCanvasCoordinates(headPos);
-                antennaSensor.Dimensions = new Point(dim, dim);
-            }
-
-            Controller.RefreshMostRecentFrame();
-        }
-
-        private void SyncTreatmentSensor()
-        {
-            var pos = new System.Drawing.Point(AppSettings.Default.TreatmentSensorX, AppSettings.Default.TreatmentSensorY);
-            
-            if (Controller?.Pipeline?.VideoInfo != null)
-            {
-                treatmentSensor.Position = Controller.ToCanvasCoordinates(pos);
-            }
-        }
-
-        private void SyncExclusionZones()
-        {
-            exclusionManager.LoadFromSettings();
-        }
-
-        private void ShowHideModelViews(bool hide)
-        {
-            modelView.Visibility = 
-            sectorView.Visibility = 
-            treatmentSensor.Visibility = 
-            antennaSensor.Visibility = 
-            lblFPS.Visibility = 
-            btnAddExclusion.Visibility = 
-                hide ? Visibility.Collapsed : Visibility.Visible;
-        }
-
-        public void LoadParamsFromJSON(string newParams)
-        {
-            AppSettings.Default.LoadFromJSON(newParams);
-        }
-
-        private void OnOpen()
-        {
-            ValidateSettings();
-
             SetupCanvas();
-            SetupAntennaSensor();
-            SetupTreatmentSensor();
-            SetupExclusionZones();
-            LoadFromSettings();
-            
+
             SyncAntennaSensor();
             SyncTreatmentSensor();
             SyncExclusionZones();
+        };
 
-            ShowHideModelViews(hide: false);
+        Closing += (sender, args) =>
+        {
+            Controller.Stop();
+            Hide();
+            WindowManager.ExitIfLastWindow();
+        };
 
-            Dispatcher.InvokeAsync(() => {
+        WindowManager.Exit += (sender, args) => Controller.Stop();
+    }
 
-                Thread.Sleep(500);
-                WindowManager.CenterWindowOnScreen(this);
+    private void OnFinishSetupPlayer()
+    {
+        InitDetector();
 
-            });
-            
-        }        
+        ShowHideModelViews(hide: true);
+    }
+
+    public double CanvasScale = 1.0;
+    private void SetupCanvas()
+    {
+        if (Controller.Pipeline.VideoInfo == null)
+            return;
+
+        CanvasScale = videoCanvas.ActualWidth / Controller.Pipeline.VideoInfo.Width;
+        canvasRow.Height = new GridLength(Controller.Pipeline.VideoInfo.Height * CanvasScale + videoCanvas.Margin.Top);
+
+        scrollViewer.Height = canvasRow.Height.Value + 30;
+
+        Height = double.NaN;
+        SizeToContent = SizeToContent.Height;
+    }
+
+    private void SetupAntennaSensor()
+    {
+        antennaSensor.Canvas = videoCanvas;
+        antennaSensor.CanvasScale = CanvasScale;
+        antennaSensor.Dimensions = new Point(AppSettings.Default.HeadScale * 100, AppSettings.Default.HeadScale * 100);
+        antennaSensor.Position = Controller.ToCanvasCoordinates(AppSettings.Default.Origin);
+        antennaSensor.Angle = AppSettings.Default.HeadAngle;
+
+        antennaSensor.MouseDown += (s, e) =>
+        {
+            Controller.Pause();
+        };
+
+        antennaSensor.Moved += (s, e) =>
+        {
+            var loc = Controller.ToVideoCoordinates(antennaSensor.Position);
+
+            AppSettings.Default.HeadX = loc.X;
+            AppSettings.Default.HeadY = loc.Y;
+            AppSettings.Default.SaveAsync();
+
+            LoadFromSettings();
+
+            Controller.RefreshMostRecentFrame();
+
+            Controller.Stop();
+        };
+
+        antennaSensor.Scaled += (s, e) =>
+        {
+            var loc = Controller.ToVideoCoordinates(antennaSensor.Position);
+            var dims = Controller.ToVideoCoordinates(antennaSensor.Dimensions);
+
+            AppSettings.Default.HeadX = loc.X;
+            AppSettings.Default.HeadY = loc.Y;
+            AppSettings.Default.HeadScale = antennaSensor.Scale;
+            AppSettings.Default.SaveAsync();
+
+            LoadFromSettings();
+
+            Controller.RefreshMostRecentFrame();
+
+            Controller.Stop();
+        };
+
+        antennaSensor.Rotated += (s, e) =>
+        {
+            AppSettings.Default.HeadAngle = antennaSensor.Angle;
+            AppSettings.Default.SaveAsync();
+
+            LoadFromSettings();
+
+            Controller.RefreshMostRecentFrame();
+
+            Controller.Stop();
+        };
+    }
+
+    private void SetupExclusionZones()
+    {
+        exclusionManager.window = this;
+        exclusionManager.LoadFromSettings();
+
+        exclusionManager.Changed += (s, e) =>
+        {
+            Controller.Stop();
+        };
+    }
+
+    private void SetupTreatmentSensor()
+    {
+        treatmentSensor.Canvas = videoCanvas;
+        treatmentSensor.Position = Controller.ToCanvasCoordinates(new DPoint(AppSettings.Default.TreatmentSensorX, AppSettings.Default.TreatmentSensorY));
         
-        private void OnShowFrame(Frame frame)
+        treatmentSensor.Moved += (s, e) =>
         {
-            if (frame.ProcessorResult != null)
-            {
-                var frameResult = (EfficientTipAndPERdetector.TipAndPERResult)frame.ProcessorResult;
+            var loc = Controller.ToVideoCoordinates(treatmentSensor.Position);
 
-                treatmentSensor.SensorValue = frameResult.TreatmentSensorValue.ToString();
+            AppSettings.Default.TreatmentSensorX = loc.X;
+            AppSettings.Default.TreatmentSensorY = loc.Y;
+            AppSettings.Default.SaveAsync();
 
-                modelView.Show(frameResult);
-                sectorView.Show(frameResult);
-            }
-        }
+            LoadFromSettings();
+        };
+    }
 
-        private void OnRefreshMostRecentFrame(Frame frame)
-        {
-            Processor.Annotate(frame);
-        }
+    private void LoadFromSettings()
+    {
+        ValidateSettings();
+
+        sliderX.Max = AppSettings.Default.MaxHeadX;
+        sliderX.IsEnabled = true;
+        sliderX.LoadFromSettings();
+
+        sliderY.Max = AppSettings.Default.MaxHeadY;
+        sliderY.LoadFromSettings();
+        sliderY.IsEnabled = true;
+
+        sliderScale.Max = AppSettings.Default.MaxHeadScale;
+        sliderScale.Min = 0.1;
+        sliderScale.LoadFromSettings();
+        sliderScale.IsEnabled = true;
+
+        sliderAngle.Max = 360;
+        sliderAngle.Min = -360;
+        sliderAngle.LoadFromSettings();
+        sliderAngle.IsEnabled = true;
+
+        sliderTreatX.Max = AppSettings.Default.MaxTreatX;
+        sliderTreatX.LoadFromSettings();
+        sliderTreatX.IsEnabled = true;
+
+        sliderTreatY.Max = AppSettings.Default.MaxTreatY;
+        sliderTreatY.LoadFromSettings();
+        sliderTreatY.IsEnabled = true;
+
+        chkShowFilterPoints.IsChecked = AppSettings.Default.ShowModel;
+        txtVideoLabel.Text = AppSettings.Default.VideoLabel;
+        txtVideoLabelColumn.Text = AppSettings.Default.VideoLabelColumn;
+
+    }
+
+    private void ValidateSettings()
+    {
+        AppSettings.Default.Validate(Controller.Pipeline.VideoInfo.Dimensions);
+    }
+
+    private void SyncAntennaSensor()
+    {
+        var headPos = new System.Drawing.Point(AppSettings.Default.HeadX, AppSettings.Default.HeadY);
+        var dim = AppSettings.Default.HeadScale * 100 * CanvasScale;
         
-        private void InitDetector()
+        if (Controller?.Pipeline?.VideoInfo != null)
         {
-            //Preserve existing frame results if resetting
-            Dictionary<int, EfficientTipAndPERdetector.TipAndPERResult> prevData = null;
-
-            if (Processor != null)
-            {
-                prevData = Processor.Results;
-            }
-
-            Controller.Pipeline.VideoProcessor = Processor = new EfficientTipAndPERdetector();
-
-            if (prevData != null)
-                Processor.Results = prevData;
+            antennaSensor.Position = Controller.ToCanvasCoordinates(headPos);
+            antennaSensor.Dimensions = new Point(dim, dim);
         }
 
+        Controller.RefreshMostRecentFrame();
+    }
 
-
-        /// <summary>
-        /// CSVs are saved in same folder as the video, with "_tracker_", username, and timestamp appended.
-        /// </summary>
-        private FileInfo GetDefaultCsvPath(string videoFile)
+    private void SyncTreatmentSensor()
+    {
+        var pos = new System.Drawing.Point(AppSettings.Default.TreatmentSensorX, AppSettings.Default.TreatmentSensorY);
+        
+        if (Controller?.Pipeline?.VideoInfo != null)
         {
-            var csvFile = new FileInfo(videoFile).FullName + "_Tracker_" + Controller.GetCSVfileEnding();
+            treatmentSensor.Position = Controller.ToCanvasCoordinates(pos);
+        }
+    }
 
-            return new FileInfo(csvFile);
+    private void SyncExclusionZones()
+    {
+        exclusionManager.LoadFromSettings();
+    }
+
+    private void ShowHideModelViews(bool hide)
+    {
+        modelView.Visibility = 
+        sectorView.Visibility = 
+        treatmentSensor.Visibility = 
+        antennaSensor.Visibility = 
+        lblFPS.Visibility = 
+        btnAddExclusion.Visibility = 
+            hide ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    public void LoadParamsFromJSON(string newParams)
+    {
+        AppSettings.Default.LoadFromJSON(newParams);
+    }
+
+    private void OnOpen()
+    {
+        ValidateSettings();
+
+        SetupCanvas();
+        SetupAntennaSensor();
+        SetupTreatmentSensor();
+        SetupExclusionZones();
+        LoadFromSettings();
+        
+        SyncAntennaSensor();
+        SyncTreatmentSensor();
+        SyncExclusionZones();
+
+        ShowHideModelViews(hide: false);
+
+        Dispatcher.InvokeAsync(() => {
+
+            Thread.Sleep(500);
+            WindowManager.CenterWindowOnScreen(this);
+
+        });
+        
+    }        
+    
+    private void OnShowFrame(Frame frame)
+    {
+        if (frame.ProcessorResult != null)
+        {
+            var frameResult = (EfficientTipAndPERdetector.TipAndPERResult)frame.ProcessorResult;
+
+            treatmentSensor.SensorValue = frameResult.TreatmentSensorValue.ToString();
+
+            modelView.Show(frameResult);
+            sectorView.Show(frameResult);
+        }
+    }
+
+    private void OnRefreshMostRecentFrame(Frame frame)
+    {
+        Processor.Annotate(frame);
+    }
+    
+    private void InitDetector()
+    {
+        //Preserve existing frame results if resetting
+        Dictionary<int, EfficientTipAndPERdetector.TipAndPERResult> prevData = null;
+
+        if (Processor != null)
+        {
+            prevData = Processor.Results;
         }
 
-        private void btnSaveActivity_Click(object sender, RoutedEventArgs e)
+        Controller.Pipeline.VideoProcessor = Processor = new EfficientTipAndPERdetector();
+
+        if (prevData != null)
+            Processor.Results = prevData;
+    }
+
+
+
+    /// <summary>
+    /// CSVs are saved in same folder as the video, with "_tracker_", username, and timestamp appended.
+    /// </summary>
+    private FileInfo GetDefaultCsvPath(string videoFile)
+    {
+        var csvFile = new FileInfo(videoFile).FullName + "_Tracker_" + Controller.GetCSVfileEnding();
+
+        return new FileInfo(csvFile);
+    }
+
+    private void btnSaveActivity_Click(object sender, RoutedEventArgs e)
+    {
+        var videoPath = txtFileName.Text;
+        if (string.IsNullOrWhiteSpace(videoPath))
+            return;
+
+        var defaultCSV = GetDefaultCsvPath(videoPath);
+
+        var dlg = new Microsoft.Win32.SaveFileDialog()
         {
-            var videoPath = txtFileName.Text;
-            if (string.IsNullOrWhiteSpace(videoPath))
+            InitialDirectory = defaultCSV.DirectoryName,
+            FileName = defaultCSV.Name,
+            DefaultExt = ".csv",
+            Filter = "Comma Separated Values (CSV) Files|*.csv"
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            new Thread((path) => { SaveCSV((string)path); }) { IsBackground = true }.Start(dlg.FileName);
+        }
+    }
+
+    public void SaveCSV(object baseFileName)
+    {
+        if (string.IsNullOrWhiteSpace(baseFileName.ToString()))
+            return;
+
+        var path = GetDefaultCsvPath(baseFileName.ToString());
+
+        SaveCSV(path.FullName);
+    }
+
+    public void SaveCSV(string csvFile)
+    {
+        if(AppSettings.Default.VideoLabelColumn.Split(',').Length != AppSettings.Default.VideoLabel.Split(',').Length)
+        {
+            MessageBox.Show("Make sure the number of commas (',') is the same in both the column label and column value field.");
+            return;
+        }
+
+        using (var writer = new StreamWriter(csvFile, false))
+        {
+            writer.WriteLine
+            (
+                AppSettings.Default.VideoLabelColumn + ", Frame, TreatmentSensor, " + 
+                "PER-X, PER-Y, PER-Length, " +
+                "LeftSector, RightSector, " +
+                "LeftSectorMode, RightSectorMode, " +
+                "LeftAngle, RightAngle, " +
+                "LeftFlagellumTip-X, LeftFlagellumTip-Y, RightFlagellumTip-X, RightFlagellumTip-Y, " +
+                "LeftFlagellumBase-X, LeftFlagellumBase-Y, RightFlagellumBase-X, RightFlagellumBase-Y, " +
+                "RotationAngle, AntennaSensorWidth, AntennaSensorHeight, " +
+                "AntennaSensorOffset-X, AntennaSensorOffset-Y, AntennaSensorScale-X, AntennaSensorScale-Y" //, " +
+                //"SectorData"
+            );
+
+            var data = Processor.Results;
+
+            if (data == null)
                 return;
 
-            var defaultCSV = GetDefaultCsvPath(videoPath);
+            var frames = data.Keys.OrderBy(frameIndex => frameIndex).ToList();
 
-            var dlg = new Microsoft.Win32.SaveFileDialog()
+            Dispatcher.Invoke(() => btnSaveActivity.Content = "Saving...");
+
+            frames.ForEach(frameIndex =>
             {
-                InitialDirectory = defaultCSV.DirectoryName,
-                FileName = defaultCSV.Name,
-                DefaultExt = ".csv",
-                Filter = "Comma Separated Values (CSV) Files|*.csv"
-            };
-
-            if (dlg.ShowDialog() == true)
-            {
-                new Thread((path) => { SaveCSV((string)path); }) { IsBackground = true }.Start(dlg.FileName);
-            }
-        }
-
-        public void SaveCSV(object baseFileName)
-        {
-            if (string.IsNullOrWhiteSpace(baseFileName.ToString()))
-                return;
-
-            var path = GetDefaultCsvPath(baseFileName.ToString());
-
-            SaveCSV(path.FullName);
-        }
-
-        public void SaveCSV(string csvFile)
-        {
-            if(AppSettings.Default.VideoLabelColumn.Split(',').Length != AppSettings.Default.VideoLabel.Split(',').Length)
-            {
-                MessageBox.Show("Make sure the number of commas (',') is the same in both the column label and column value field.");
-                return;
-            }
-
-            using (var writer = new StreamWriter(csvFile, false))
-            {
-                writer.WriteLine
-                (
-                    AppSettings.Default.VideoLabelColumn + ", Frame, TreatmentSensor, " + 
-                    "PER-X, PER-Y, PER-Length, " +
-                    "LeftSector, RightSector, " +
-                    "LeftSectorMode, RightSectorMode, " +
-                    "LeftAngle, RightAngle, " +
-                    "LeftFlagellumTip-X, LeftFlagellumTip-Y, RightFlagellumTip-X, RightFlagellumTip-Y, " +
-                    "LeftFlagellumBase-X, LeftFlagellumBase-Y, RightFlagellumBase-X, RightFlagellumBase-Y, " +
-                    "RotationAngle, AntennaSensorWidth, AntennaSensorHeight, " +
-                    "AntennaSensorOffset-X, AntennaSensorOffset-Y, AntennaSensorScale-X, AntennaSensorScale-Y" //, " +
-                    //"SectorData"
-                );
-
-                var data = Processor.Results;
-
-                if (data == null)
-                    return;
-
-                var frames = data.Keys.OrderBy(frameIndex => frameIndex).ToList();
-
-                Dispatcher.Invoke(() => btnSaveActivity.Content = "Saving...");
-
-                frames.ForEach(frameIndex =>
+                var value = data[frameIndex];
+                var recordingConditions = value?.RecordingConditions;
+                
+                var line = string.Join(",", new object[]
                 {
-                    var value = data[frameIndex];
-                    var recordingConditions = value?.RecordingConditions;
-                    
-                    var line = string.Join(",", new object[]
-                    {
-                        AppSettings.Default.VideoLabel, frameIndex, value?.TreatmentSensorValue,
+                    AppSettings.Default.VideoLabel, frameIndex, value?.TreatmentSensorValue,
 
-                        value?.Proboscis?.Tip?.FramePoint.X,
-                        value?.Proboscis?.Tip?.FramePoint.Y,
-                        value?.Proboscis?.Length,
+                    value?.Proboscis?.Tip?.FramePoint.X,
+                    value?.Proboscis?.Tip?.FramePoint.Y,
+                    value?.Proboscis?.Length,
 
-                        value?.Left?.DominantSector,
-                        value?.Right?.DominantSector,
+                    value?.Left?.DominantSector,
+                    value?.Right?.DominantSector,
 
-                        value?.Left?.TopAngle,
-                        value?.Right?.TopAngle,
+                    value?.Left?.TopAngle,
+                    value?.Right?.TopAngle,
 
-                        value?.Left?.Angle,
-                        -value?.Right?.Angle,
+                    value?.Left?.Angle,
+                    -value?.Right?.Angle,
 
-                        value?.Left?.Tip?.FramePoint.X, value?.Left?.Tip?.FramePoint.Y,
-                        value?.Right?.Tip?.FramePoint.X, value?.Right?.Tip?.FramePoint.Y,
+                    value?.Left?.Tip?.FramePoint.X, value?.Left?.Tip?.FramePoint.Y,
+                    value?.Right?.Tip?.FramePoint.X, value?.Right?.Tip?.FramePoint.Y,
 
-                        value?.Left?.Base.FramePoint.X, value?.Left?.Base.FramePoint.Y,
-                        value?.Right?.Base.FramePoint.X, value?.Right?.Base.FramePoint.Y,
+                    value?.Left?.Base.FramePoint.X, value?.Left?.Base.FramePoint.Y,
+                    value?.Right?.Base.FramePoint.X, value?.Right?.Base.FramePoint.Y,
 
-                        recordingConditions?.HeadAngle,
+                    recordingConditions?.HeadAngle,
 
-                        recordingConditions?.AntennaSensorDims.X,
-                        recordingConditions?.AntennaSensorDims.Y,
+                    recordingConditions?.AntennaSensorDims.X,
+                    recordingConditions?.AntennaSensorDims.Y,
 
-                        recordingConditions?.AntennaSensorOffset.X,
-                        recordingConditions?.AntennaSensorOffset.Y,
+                    recordingConditions?.AntennaSensorOffset.X,
+                    recordingConditions?.AntennaSensorOffset.Y,
 
-                        recordingConditions?.ScaleX,
-                        recordingConditions?.ScaleX
-                    });
-
-                    //string sectorData = "";
-
-                    //if (value.Left.SectorCounts != null && value.Right.SectorCounts != null)
-                    //{
-                    //    sectorData = string.Join(",", value.Left.SectorCounts) + "," + string.Join(",", value.Right.SectorCounts);
-                    //}
-
-                    writer.WriteLine(line);// + ", " + sectorData);
-
+                    recordingConditions?.ScaleX,
+                    recordingConditions?.ScaleX
                 });
 
-                writer.Flush();
-            }
+                //string sectorData = "";
 
-            Dispatcher.InvokeAsync(() => btnSaveActivity.Content = "Saved!");
+                //if (value.Left.SectorCounts != null && value.Right.SectorCounts != null)
+                //{
+                //    sectorData = string.Join(",", value.Left.SectorCounts) + "," + string.Join(",", value.Right.SectorCounts);
+                //}
 
-            new Thread(() =>
-            {
-                Thread.Sleep(2000);
+                writer.WriteLine(line);// + ", " + sectorData);
 
-                Dispatcher.InvokeAsync(() => { btnSaveActivity.Content = "Save Activity Data"; });
-            })
-            {
-                IsBackground = true
-            }
-            .Start();
+            });
+
+            writer.Flush();
         }
-        
-        private void CheckBox_Click(object sender, RoutedEventArgs e)
+
+        Dispatcher.InvokeAsync(() => btnSaveActivity.Content = "Saved!");
+
+        new Thread(() =>
         {
-            pnlManualData.IsEnabled = (bool)((CheckBox)sender).IsChecked;
-            AppSettings.Default.CompareToManualData = pnlManualData.IsEnabled;
-            AppSettings.Default.SaveAsync();
-        }
+            Thread.Sleep(2000);
 
-        private void OnManualBrowseClicked(object sender, RoutedEventArgs e)
+            Dispatcher.InvokeAsync(() => { btnSaveActivity.Content = "Save Activity Data"; });
+        })
         {
-            var ofd = new Microsoft.Win32.OpenFileDialog();
-
-            var result = ofd.ShowDialog();
-
-            if (result == false)
-                return;
-
-            txtManualFile.Text = ofd.FileName;
-            AppSettings.Default.ManualDataFile = ofd.FileName;
-            AppSettings.Default.SaveAsync();
+            IsBackground = true
         }
+        .Start();
+    }
+    
+    private void CheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        pnlManualData.IsEnabled = (bool)((CheckBox)sender).IsChecked;
+        AppSettings.Default.CompareToManualData = pnlManualData.IsEnabled;
+        AppSettings.Default.SaveAsync();
+    }
 
-        
-        private void btnShowBatchList_Click(object sender, RoutedEventArgs e)
-        {
-            Hide();
-            WindowManager.ShowBatchWindow();
-        }
+    private void OnManualBrowseClicked(object sender, RoutedEventArgs e)
+    {
+        var ofd = new Microsoft.Win32.OpenFileDialog();
 
-        private void btnSaveBatchParams_Click(object sender, RoutedEventArgs e)
-        {
-            WindowManager.BatchWindow.SaveParams(AppSettings.Default);
-            WindowManager.ShowBatchWindow();
-            Hide();
-        }
+        var result = ofd.ShowDialog();
 
-        ExclusionZoneManager exclusionManager = new ExclusionZoneManager();
-        private void btnAddExclusion_Click(object sender, RoutedEventArgs e)
-        {
-            exclusionManager.window = this;
-            exclusionManager.AddClicked();
-        }
-        
-        private void exclusionShim_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            exclusionManager.MouseDown();
-        }
+        if (result == false)
+            return;
 
-        private void exclusionShim_MouseMove(object sender, MouseEventArgs e)
-        {
-            exclusionManager.MouseMove();
-        }
+        txtManualFile.Text = ofd.FileName;
+        AppSettings.Default.ManualDataFile = ofd.FileName;
+        AppSettings.Default.SaveAsync();
+    }
 
-        private void btnRemoveExclusion_Click(object sender, RoutedEventArgs e)
-        {
-            exclusionManager.RemoveClicked();
-        }
+    
+    private void btnShowBatchList_Click(object sender, RoutedEventArgs e)
+    {
+        Hide();
+        WindowManager.ShowBatchWindow();
+    }
 
-        private void chkShowFilterPoints_Click(object sender, RoutedEventArgs e)
-        {
-            AppSettings.Default.ShowModel = chkShowFilterPoints.IsChecked.Value;
-            AppSettings.Default.SaveAsync();
-        }
+    private void btnSaveBatchParams_Click(object sender, RoutedEventArgs e)
+    {
+        WindowManager.BatchWindow.SaveParams(AppSettings.Default);
+        WindowManager.ShowBatchWindow();
+        Hide();
+    }
 
-        private void txtVideoLabel_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            AppSettings.Default.VideoLabel = txtVideoLabel.Text;
-            AppSettings.Default.SaveAsync();
-        }
+    readonly ExclusionZoneManager exclusionManager = new();
+    private void btnAddExclusion_Click(object sender, RoutedEventArgs e)
+    {
+        exclusionManager.window = this;
+        exclusionManager.AddClicked();
+    }
+    
+    private void exclusionShim_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        exclusionManager.MouseDown();
+    }
 
-        private void txtVideoLabelColumn_TextChanged(object sender, TextChangedEventArgs e)
-        {
+    private void exclusionShim_MouseMove(object sender, MouseEventArgs e)
+    {
+        exclusionManager.MouseMove();
+    }
 
-            AppSettings.Default.VideoLabelColumn = txtVideoLabelColumn.Text;
-            AppSettings.Default.SaveAsync();
-        }
+    private void btnRemoveExclusion_Click(object sender, RoutedEventArgs e)
+    {
+        exclusionManager.RemoveClicked();
+    }
+
+    private void chkShowFilterPoints_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Default.ShowModel = chkShowFilterPoints.IsChecked.Value;
+        AppSettings.Default.SaveAsync();
+    }
+
+    private void txtVideoLabel_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        AppSettings.Default.VideoLabel = txtVideoLabel.Text;
+        AppSettings.Default.SaveAsync();
+    }
+
+    private void txtVideoLabelColumn_TextChanged(object sender, TextChangedEventArgs e)
+    {
+
+        AppSettings.Default.VideoLabelColumn = txtVideoLabelColumn.Text;
+        AppSettings.Default.SaveAsync();
     }
 }
