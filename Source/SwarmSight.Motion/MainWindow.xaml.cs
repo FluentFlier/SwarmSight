@@ -1,25 +1,16 @@
-﻿using System.Linq;
-using System.Windows.Controls;
-using Classes;
-using SwarmSight.VideoPlayer;
-using SwarmSight.Stats;
+﻿using Classes;
 using OxyPlot.Wpf;
+using SwarmSight.Motion.Processor;
+using SwarmSight.Stats;
+using SwarmSight.UserControls;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Windows;
-using System.Windows.Media.Imaging;
-using SwarmSight.Filters;
-using SwarmSight.UserControls;
 using Frame = SwarmSight.Filters.Frame;
 using Point = System.Windows.Point;
-using System.Windows.Input;
-using System.Windows.Media;
-using SwarmSight.Motion.Processor;
 
 namespace SwarmSight
 {
@@ -47,7 +38,6 @@ namespace SwarmSight
                 btnPlayPause = btnPlayPause,
                 btnStepFrame = btnStepFrame,
                 btnSave = btnSaveActivity,
-                btnStop = btnStop,
                 Canvas = videoCanvas,
                 lblTime = lblTime,
                 lblFPS = lblFPS,

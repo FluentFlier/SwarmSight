@@ -234,3 +234,5 @@ $RECYCLE.BIN/
 *.RData
 
 _site/
+/Source/.vs/SwarmSight
+/.vs

@@ -151,8 +151,6 @@
                 <Button x:Name="btnPlayPause" Content="4" HorizontalAlignment="Left" VerticalAlignment="Bottom" Width="41"
                     FontFamily="Webdings" Height="18" Opacity="0.8"
                     ToolTip="Play/Pause video playback" />
-                <Button x:Name="btnStop" Content="&lt;" HorizontalAlignment="Left" VerticalAlignment="Top" Width="38" FontFamily="Webdings"
-                    Height="18" Opacity="0.8" ToolTip="Stop playing video" />
                 <Button x:Name="btnStepFrame" Content="8" HorizontalAlignment="Left" VerticalAlignment="Top" Width="38" FontFamily="Webdings"
                     Height="18" Opacity="0.8" ToolTip="Step One Frame" Visibility="Hidden" />
             </StackPanel>
